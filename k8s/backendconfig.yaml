@@ -1,0 +1,16 @@
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: qwen-llm-backendconfig
+  namespace: llm
+spec:
+  healthCheck:
+    checkIntervalSec: 15
+    port: 8080
+    type: HTTP
+    requestPath: /health
+  securityPolicy:
+    # Must already exist — created by bradjobe-dev-infra's cloud_armor.tf,
+    # applied before this manifest since it's a separate repo/pipeline.
+    name: llm-rate-limit
+  timeoutSec: 120

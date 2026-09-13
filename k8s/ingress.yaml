@@ -1,0 +1,20 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: qwen-llm-ingress
+  namespace: llm
+  annotations:
+    kubernetes.io/ingress.class: gce
+    # Reserved by bradjobe-dev-infra's lb.tf (google_compute_global_address.llm_ingress)
+    # and pointed at by dns.tf's llm.bradjobe.dev A record — claimed here
+    # by name, not by IP literal, so this manifest never needs to change
+    # if the address is ever recreated.
+    kubernetes.io/ingress.global-static-ip-name: llm-ingress-ip
+    networking.gke.io/managed-certificates: qwen-llm-cert
+    kubernetes.io/ingress.allow-http: "false"
+spec:
+  defaultBackend:
+    service:
+      name: qwen-llm
+      port:
+        number: 80

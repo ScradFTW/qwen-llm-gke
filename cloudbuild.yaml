@@ -1,0 +1,89 @@
+# Deploys on every push to main — see bradjobe-dev-infra's
+# cloudbuild_triggers.tf (google_cloudbuild_trigger.app["qwen-llm-gke"]).
+# Unlike the Cloud Run services, this ends in `kubectl apply`, not
+# `gcloud run deploy` — the cluster/node pool are Terraform's job
+# (bradjobe-dev-infra/gke.tf), the workload on top of them is this repo's.
+steps:
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_ARTIFACT_REGISTRY}/qwen-llm:${SHORT_SHA}
+      - .
+
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - ${_ARTIFACT_REGISTRY}/qwen-llm:${SHORT_SHA}
+
+  - id: get-credentials
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    # HOME=/workspace on every gcloud/kubectl step below: Cloud Build steps
+    # only share /workspace with each other, not each step's default $HOME,
+    # and `gcloud container clusters get-credentials` writes the kubeconfig
+    # kubectl needs to ~/.kube/config.
+    env:
+      - HOME=/workspace
+    args:
+      - container
+      - clusters
+      - get-credentials
+      - ${_CLUSTER}
+      - --zone=${_ZONE}
+
+  - id: render-manifests
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: sh
+    args:
+      - -c
+      - |
+        sed "s#IMAGE_PLACEHOLDER#${_ARTIFACT_REGISTRY}/qwen-llm:${SHORT_SHA}#" \
+          k8s/deployment.yaml > /workspace/deployment.rendered.yaml
+
+  - id: apply
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: kubectl
+    args:
+      - apply
+      - -f
+      - k8s/namespace.yaml
+      - -f
+      - k8s/cors-proxy-configmap.yaml
+      - -f
+      - k8s/backendconfig.yaml
+      - -f
+      - k8s/service.yaml
+      - -f
+      - /workspace/deployment.rendered.yaml
+      - -f
+      - k8s/managed-certificate.yaml
+      - -f
+      - k8s/ingress.yaml
+    env:
+      - HOME=/workspace
+
+  - id: wait-for-rollout
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: kubectl
+    args:
+      - -n
+      - llm
+      - rollout
+      - status
+      - deployment/qwen-llm
+      - --timeout=600s
+    env:
+      - HOME=/workspace
+
+substitutions:
+  _ZONE: northamerica-northeast1-a
+  _CLUSTER: bradjobe-llm-cluster
+  _ARTIFACT_REGISTRY: northamerica-northeast1-docker.pkg.dev/bradjobe-dev/apps
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: 2400s

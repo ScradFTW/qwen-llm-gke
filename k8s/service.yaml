@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: qwen-llm
+  namespace: llm
+  annotations:
+    # Attaches the Cloud Armor policy Terraform created (bradjobe-dev-infra's
+    # cloud_armor.tf google_compute_security_policy.llm_rate_limit) and a
+    # custom health check path, since GKE Ingress creates its own backend
+    # service that Terraform never sees.
+    cloud.google.com/backend-config: '{"default": "qwen-llm-backendconfig"}'
+spec:
+  type: ClusterIP
+  selector:
+    app: qwen-llm
+  ports:
+    - port: 80
+      targetPort: 8080
