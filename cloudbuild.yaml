@@ -79,11 +79,18 @@ steps:
       - HOME=/workspace
 
 substitutions:
-  _ZONE: northamerica-northeast1-a
+  # Must match bradjobe-dev-infra's var.zone — -c, not -a, since that's
+  # the only zone in this region with T4 GPU capacity. Update both
+  # together if it ever changes.
+  _ZONE: northamerica-northeast1-c
   _CLUSTER: bradjobe-llm-cluster
   _ARTIFACT_REGISTRY: northamerica-northeast1-docker.pkg.dev/bradjobe-dev/apps
 
 options:
   logging: CLOUD_LOGGING_ONLY
+  # Compiling llama.cpp from source with nvcc is genuinely slow on the
+  # default machine — a first attempt was still on the docker build step
+  # after 26 minutes. A high-CPU machine cuts that materially.
+  machineType: E2_HIGHCPU_8
 
-timeout: 2400s
+timeout: 3600s
