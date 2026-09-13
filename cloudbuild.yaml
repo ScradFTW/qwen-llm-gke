@@ -46,7 +46,9 @@ steps:
           ${_DEPLOYMENT_MANIFEST} > /workspace/deployment.rendered.yaml
 
   - id: apply
-    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    # Not :slim — that variant doesn't bundle kubectl at all ("executable
+    # file not found in $PATH"), confirmed by a real failed build.
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
     entrypoint: kubectl
     args:
       - apply
@@ -68,7 +70,7 @@ steps:
       - HOME=/workspace
 
   - id: wait-for-rollout
-    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
     entrypoint: kubectl
     args:
       - -n
