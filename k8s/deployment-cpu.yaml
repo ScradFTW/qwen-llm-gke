@@ -1,0 +1,80 @@
+# Temporary CPU-only fallback while GPU quota is pending — see
+# bradjobe-dev-infra's gke.tf llm_cpu node pool and Dockerfile.cpu here.
+# Applied INSTEAD of deployment.yaml for now (cloudbuild.yaml's apply
+# step references this file) — swap back once GPU quota lands.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qwen-llm
+  namespace: llm
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: qwen-llm
+  template:
+    metadata:
+      labels:
+        app: qwen-llm
+    spec:
+      nodeSelector:
+        cloud.google.com/gke-nodepool: llm-cpu-pool
+      tolerations:
+        # GKE auto-taints every Spot node this way — see
+        # bradjobe-dev-infra's gke.tf.
+        - key: cloud.google.com/gke-spot
+          operator: Equal
+          value: "true"
+          effect: NoSchedule
+      # Soft anti-affinity: one replica per node where possible, so this
+      # actually shows a real multi-node spread instead of 4 pods bunched
+      # onto one or two of the 4 nodes.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: qwen-llm
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: llama-server
+          image: IMAGE_PLACEHOLDER # replaced by cloudbuild.yaml's `sed` step
+          ports:
+            - containerPort: 8081
+          resources:
+            requests:
+              cpu: "1"
+              memory: 512Mi
+            limits:
+              memory: 1536Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 30
+            periodSeconds: 20
+        - name: cors-proxy
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: cors-proxy-conf
+              mountPath: /etc/nginx/conf.d
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              memory: 64Mi
+      volumes:
+        - name: cors-proxy-conf
+          configMap:
+            name: cors-proxy-conf

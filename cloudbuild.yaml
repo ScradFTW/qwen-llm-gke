@@ -8,6 +8,8 @@ steps:
     name: gcr.io/cloud-builders/docker
     args:
       - build
+      - -f
+      - ${_DOCKERFILE}
       - -t
       - ${_ARTIFACT_REGISTRY}/qwen-llm:${SHORT_SHA}
       - .
@@ -41,7 +43,7 @@ steps:
       - -c
       - |
         sed "s#IMAGE_PLACEHOLDER#${_ARTIFACT_REGISTRY}/qwen-llm:${SHORT_SHA}#" \
-          k8s/deployment.yaml > /workspace/deployment.rendered.yaml
+          ${_DEPLOYMENT_MANIFEST} > /workspace/deployment.rendered.yaml
 
   - id: apply
     name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
@@ -85,6 +87,12 @@ substitutions:
   _ZONE: northamerica-northeast1-c
   _CLUSTER: bradjobe-llm-cluster
   _ARTIFACT_REGISTRY: northamerica-northeast1-docker.pkg.dev/bradjobe-dev/apps
+  # TEMPORARY: CPU fallback while GPU quota is pending (see
+  # bradjobe-dev-infra's gke.tf llm_cpu pool). Once both GPU quotas are
+  # approved and llm_gpu_pool is live, switch these two back to
+  # `Dockerfile` and `k8s/deployment.yaml`.
+  _DOCKERFILE: Dockerfile.cpu
+  _DEPLOYMENT_MANIFEST: k8s/deployment-cpu.yaml
 
 options:
   logging: CLOUD_LOGGING_ONLY
