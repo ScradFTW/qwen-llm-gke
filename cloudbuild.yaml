@@ -4,6 +4,21 @@
 # `gcloud run deploy` — the cluster/node pool are Terraform's job
 # (bradjobe-dev-infra/gke.tf), the workload on top of them is this repo's.
 steps:
+  - id: validate
+    # Runs scripts/test_validate_manifests.py (unit + fixture-driven tests
+    # for scripts/validate_manifests.py's parsing/cross-referencing logic),
+    # then the validator itself against this repo's actual k8s/ manifests
+    # and cloudbuild.yaml wiring. A nonzero exit here fails the build
+    # before anything gets built, pushed, or applied.
+    name: python:3.12-slim
+    entrypoint: sh
+    args:
+      - -c
+      - |
+        pip install --quiet --no-cache-dir --break-system-packages pyyaml
+        python3 -m unittest discover -s scripts -p 'test_*.py' -v
+        python3 scripts/validate_manifests.py
+
   - id: build
     name: gcr.io/cloud-builders/docker
     args:
