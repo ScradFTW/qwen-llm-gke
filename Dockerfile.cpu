@@ -22,7 +22,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 COPY --from=build /src/build/bin/llama-server ./llama-server
-COPY --from=build /src/build/bin/*.so ./
+# *.so* (not *.so): llama.cpp's shared libs use SONAME versioning
+# (libllama-common.so.0 etc.) — confirmed by a real crash, "error while
+# loading shared libraries: libllama-common.so.0: cannot open shared
+# object file", from the plain *.so glob missing every versioned one.
+COPY --from=build /src/build/bin/*.so* ./
 
 # Same model, same source, same byte size as the GPU Dockerfile — see
 # that file's comment for the size-match verification against the VPS.

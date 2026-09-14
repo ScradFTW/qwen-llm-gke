@@ -19,7 +19,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 COPY --from=build /src/build/bin/llama-server ./llama-server
-COPY --from=build /src/build/bin/*.so ./
+# *.so* (not *.so): llama.cpp's shared libs use SONAME versioning
+# (libllama-common.so.0 etc.) — see Dockerfile.cpu, where this exact glob
+# bug was caught by a real crash on the CPU build.
+COPY --from=build /src/build/bin/*.so* ./
 
 # Baked into the image rather than fetched from GCS at pod start — one
 # model, rebuilt rarely, and Docker's layer cache means this ~470MB layer
