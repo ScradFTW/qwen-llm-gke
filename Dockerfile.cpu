@@ -16,8 +16,13 @@ RUN cmake -B build -DCMAKE_BUILD_TYPE=Release \
     && cmake --build build --config Release -j"$(nproc)" --target llama-server
 
 FROM debian:bookworm-slim
+# libgomp1: GNU OpenMP runtime — llama.cpp's CPU backend links against it
+# even without CUDA. Confirmed by a real crash: "error while loading
+# shared libraries: libgomp.so.1: cannot open shared object file". The
+# build stage has it transitively via build-essential; the runtime stage
+# never installed it on its own.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      curl ca-certificates \
+      curl ca-certificates libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

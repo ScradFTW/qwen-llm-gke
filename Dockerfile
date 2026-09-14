@@ -13,8 +13,11 @@ RUN cmake -B build -DGGML_CUDA=ON -DCMAKE_BUILD_TYPE=Release \
     && cmake --build build --config Release -j"$(nproc)" --target llama-server
 
 FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
+# libgomp1: GNU OpenMP runtime — llama.cpp's CPU-side code paths link
+# against it even in a CUDA build. See Dockerfile.cpu, where this exact
+# missing-library crash was caught for real.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      curl ca-certificates \
+      curl ca-certificates libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
