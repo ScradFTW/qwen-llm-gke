@@ -2,6 +2,11 @@
 # bradjobe-dev-infra's gke.tf llm_cpu node pool and Dockerfile.cpu here.
 # Applied INSTEAD of deployment.yaml for now (cloudbuild.yaml's apply
 # step references this file) — swap back once GPU quota lands.
+#
+# Single container: no CORS sidecar (llama-server handles that itself —
+# see Dockerfile.cpu), so no probe-routing footgun from binding the app
+# to loopback and then health-checking the pod IP (a real bug this fixed
+# once already).
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -42,7 +47,7 @@ spec:
         - name: llama-server
           image: IMAGE_PLACEHOLDER # replaced by cloudbuild.yaml's `sed` step
           ports:
-            - containerPort: 8081
+            - containerPort: 8080
           resources:
             requests:
               cpu: "500m"
@@ -52,29 +57,12 @@ spec:
           readinessProbe:
             httpGet:
               path: /health
-              port: 8081
+              port: 8080
             initialDelaySeconds: 15
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /health
-              port: 8081
+              port: 8080
             initialDelaySeconds: 30
             periodSeconds: 20
-        - name: cors-proxy
-          image: nginx:1.27-alpine
-          ports:
-            - containerPort: 8080
-          volumeMounts:
-            - name: cors-proxy-conf
-              mountPath: /etc/nginx/conf.d
-          resources:
-            requests:
-              cpu: 50m
-              memory: 32Mi
-            limits:
-              memory: 64Mi
-      volumes:
-        - name: cors-proxy-conf
-          configMap:
-            name: cors-proxy-conf

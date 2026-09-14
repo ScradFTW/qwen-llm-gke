@@ -1,53 +1,21 @@
 # Temporary fallback while GPU quota is pending (see bradjobe-dev-infra's
-# gke.tf llm_cpu node pool) — same llama.cpp build/quantization as
-# Dockerfile (the CUDA one), just without GGML_CUDA and with -ngl 0,
-# exactly matching how the old VPS ran this (CPU-only, no GPU on that
-# box). Swap the qwen-llm-gke trigger's _DOCKERFILE substitution back to
-# `Dockerfile` and k8s/deployment.yaml back in once GPU quota lands.
-FROM debian:bookworm-slim AS build
+# gke.tf llm_cpu node pool). Built on llama.cpp's own official image
+# instead of compiling from source — the from-source multi-stage build
+# this replaced hit two real bugs in a row (a *.so glob that missed
+# SONAME-versioned shared libs, then a missing libgomp1) that upstream's
+# own image already gets right. See Dockerfile for the GPU equivalent.
+#
+# ENV LLAMA_ARG_HOST=0.0.0.0 is already set by this base image, and
+# llama-server sends permissive CORS headers itself by default ("CORS is
+# set to allow all origins", confirmed in its own startup log) — so
+# there's no nginx CORS sidecar here either; an earlier version had one,
+# entirely unnecessary.
+FROM ghcr.io/ggml-org/llama.cpp:server
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      git cmake build-essential curl ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /src
-RUN git clone --depth 1 --branch b10819 https://github.com/ggml-org/llama.cpp.git .
-RUN cmake -B build -DCMAKE_BUILD_TYPE=Release \
-    && cmake --build build --config Release -j"$(nproc)" --target llama-server
-
-FROM debian:bookworm-slim
-# libgomp1: GNU OpenMP runtime — llama.cpp's CPU backend links against it
-# even without CUDA. Confirmed by a real crash: "error while loading
-# shared libraries: libgomp.so.1: cannot open shared object file". The
-# build stage has it transitively via build-essential; the runtime stage
-# never installed it on its own.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      curl ca-certificates libgomp1 \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-COPY --from=build /src/build/bin/llama-server ./llama-server
-# *.so* (not *.so): llama.cpp's shared libs use SONAME versioning
-# (libllama-common.so.0 etc.) — confirmed by a real crash, "error while
-# loading shared libraries: libllama-common.so.0: cannot open shared
-# object file", from the plain *.so glob missing every versioned one.
-COPY --from=build /src/build/bin/*.so* ./
-
-# Same model, same source, same byte size as the GPU Dockerfile — see
-# that file's comment for the size-match verification against the VPS.
-RUN curl -fL -o model.gguf \
+# curl is already present in this base image.
+RUN curl -fL -o /model.gguf \
       "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf"
 
-ENV LD_LIBRARY_PATH=/app
-EXPOSE 8081
-
-# Bound to loopback: only the nginx sidecar (k8s/deployment-cpu.yaml)
-# talks to this directly.
-ENTRYPOINT ["/app/llama-server", \
-  "-m", "/app/model.gguf", \
-  "--host", "127.0.0.1", \
-  "--port", "8081", \
-  "-c", "2048", \
-  "--parallel", "2", \
-  "-ngl", "0", \
-  "--no-webui"]
+# ENTRYPOINT ["/app/llama-server"] is inherited from the base image; this
+# only supplies its default arguments.
+CMD ["-m", "/model.gguf", "--port", "8080", "-c", "2048", "--parallel", "2", "-ngl", "0", "--no-webui"]

@@ -55,8 +55,6 @@ steps:
       - -f
       - k8s/namespace.yaml
       - -f
-      - k8s/cors-proxy-configmap.yaml
-      - -f
       - k8s/backendconfig.yaml
       - -f
       - k8s/service.yaml
