@@ -21,10 +21,10 @@ defaults pending Google's manual approval, with no fixed timeline.
 Rather than leave the demo dark, `cloudbuild.yaml`'s `_DOCKERFILE` and
 `_DEPLOYMENT_MANIFEST` substitutions currently point at `Dockerfile.cpu`
 and `k8s/deployment-cpu.yaml` instead — same model, CPU-only (`-ngl 0`,
-what the VPS ran), on a 4-node Spot `e2-small` pool
+what the VPS ran), on a single-node Spot `e2-standard-2` pool
 (bradjobe-dev-infra's `llm_cpu` node pool) that needs no GPU quota at
-all. 4 nodes rather than the GPU pool's floor of 2 also doubles as a
-visible multi-node GKE demo in the meantime.
+all. One replica on one node: the model idles at ~1m CPU / ~110Mi, so
+extra nodes were pure cost.
 
 **To swap back once both GPU quotas are approved:**
 1. In bradjobe-dev-infra: set `enable_llm_gpu_pool = true`, push. This
@@ -49,8 +49,8 @@ visible multi-node GKE demo in the meantime.
   need real CORS headers), BackendConfig (health check + the Cloud Armor
   policy Terraform created), Service, Deployment (llama-server + the CORS
   sidecar, GPU resource request, Spot toleration), ManagedCertificate,
-  Ingress. `deployment-cpu.yaml` is the CPU-pool equivalent (4 replicas,
-  pod anti-affinity to spread across nodes, no GPU resources) —
+  Ingress. `deployment-cpu.yaml` is the CPU-pool equivalent (1 replica,
+  soft pod anti-affinity if scaled back up, no GPU resources) —
   currently the active one.
 - `cloudbuild.yaml` — builds + pushes the image, then `kubectl apply`s
   everything in `k8s/` against `bradjobe-llm-cluster`.
