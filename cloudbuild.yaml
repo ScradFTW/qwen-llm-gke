@@ -70,15 +70,26 @@ steps:
       - -f
       - k8s/namespace.yaml
       - -f
-      - k8s/backendconfig.yaml
-      - -f
       - k8s/service.yaml
       - -f
       - /workspace/deployment.rendered.yaml
-      - -f
-      - k8s/managed-certificate.yaml
-      - -f
-      - k8s/ingress.yaml
+    env:
+      - HOME=/workspace
+
+  - id: delete-retired
+    # llm.bradjobe.dev moved to the main load balancer (bradjobe-dev-infra
+    # lb.tf), so these no longer have manifests here — and `kubectl apply`
+    # never deletes objects whose files were removed. Idempotent.
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: kubectl
+    args:
+      - -n
+      - llm
+      - delete
+      - ingress/qwen-llm-ingress
+      - managedcertificate/qwen-llm-cert
+      - backendconfig/qwen-llm-backendconfig
+      - --ignore-not-found
     env:
       - HOME=/workspace
 

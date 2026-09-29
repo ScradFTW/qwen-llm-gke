@@ -6,9 +6,10 @@ unit) as part of [bradjobe-dev-infra](https://github.com/ScradFTW/bradjobe-dev-i
 migration to GCP — see that repo for the cluster/node pool Terraform and
 the overall migration plan.
 
-Served at `llm.bradjobe.dev` via its own GKE-native Ingress (`k8s/ingress.yaml`)
-rather than through the main load balancer that fronts everything else —
-see bradjobe-dev-infra's README for why.
+Served at `llm.bradjobe.dev` through the same load balancer that fronts
+everything else (bradjobe-dev-infra's lb.tf): the Service exposes a
+standalone NEG named `qwen-llm-neg`, and Terraform owns the backend
+service, health check, certificate and Cloud Armor rate limit.
 
 ## ⚠️ Currently running CPU-only, temporarily
 
@@ -46,10 +47,9 @@ extra nodes were pure cost.
   `-ngl 0` — currently the active one, see above.
 - `k8s/` — Namespace, ConfigMap (nginx CORS sidecar config —
   llm.bradjobe.dev is a different origin from bradjobe.dev, so responses
-  need real CORS headers), BackendConfig (health check + the Cloud Armor
-  policy Terraform created), Service, Deployment (llama-server + the CORS
-  sidecar, GPU resource request, Spot toleration), ManagedCertificate,
-  Ingress. `deployment-cpu.yaml` is the CPU-pool equivalent (1 replica,
+  need real CORS headers), Service (with the standalone NEG), Deployment
+  (llama-server + the CORS sidecar, GPU resource request, Spot
+  toleration). `deployment-cpu.yaml` is the CPU-pool equivalent (1 replica,
   soft pod anti-affinity if scaled back up, no GPU resources) —
   currently the active one.
 - `cloudbuild.yaml` — builds + pushes the image, then `kubectl apply`s
