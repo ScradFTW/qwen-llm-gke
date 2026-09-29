@@ -13,7 +13,7 @@ metadata:
   name: qwen-llm
   namespace: llm
 spec:
-  replicas: 4
+  replicas: 1
   selector:
     matchLabels:
       app: qwen-llm
@@ -31,9 +31,8 @@ spec:
           operator: Equal
           value: "true"
           effect: NoSchedule
-      # Soft anti-affinity: one replica per node where possible, so this
-      # actually shows a real multi-node spread instead of 4 pods bunched
-      # onto one or two of the 4 nodes.
+      # Soft anti-affinity: one replica per node where possible, if
+      # replicas and llm_cpu_node_count are ever raised back above 1.
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
