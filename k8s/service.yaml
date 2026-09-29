@@ -4,14 +4,9 @@ metadata:
   name: qwen-llm
   namespace: llm
   annotations:
-    # Attaches the Cloud Armor policy Terraform created (bradjobe-dev-infra's
-    # cloud_armor.tf google_compute_security_policy.llm_rate_limit) and a
-    # custom health check path, since GKE Ingress creates its own backend
-    # service that Terraform never sees.
-    cloud.google.com/backend-config: '{"default": "qwen-llm-backendconfig"}'
-    # Standalone NEG with a fixed name, so bradjobe-dev-infra's main load
-    # balancer (lb.tf) can reference it as a backend by name — llm.bradjobe.dev
-    # is served there instead of by a separate GKE Ingress load balancer.
+    # Standalone NEG with a fixed name: bradjobe-dev-infra's lb.tf uses it
+    # as the llm.bradjobe.dev backend on the main load balancer, where the
+    # health check and Cloud Armor rate limit are also configured.
     cloud.google.com/neg: '{"exposed_ports": {"80": {"name": "qwen-llm-neg"}}}'
 spec:
   type: ClusterIP
